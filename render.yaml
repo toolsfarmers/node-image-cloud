@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: image-server
+    runtime: python
+    plan: starter          # Cambia a "standard" o superior si necesitas más recursos
+    region: oregon         # us-west-2; ajusta según tu preferencia (frankfurt, singapore…)
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+
+    envVars:
+      - key: IMAGES_DIR
+        value: /data/images       # Ruta del disco persistente montado
+      - key: MAX_FILE_SIZE_MB
+        value: "10"               # Tamaño máximo por imagen en MB
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+
+    disk:
+      name: images-storage
+      mountPath: /data/images     # Render monta el disco aquí; los archivos son permanentes
+      sizeGB: 10                  # Ajusta el tamaño según tus necesidades
