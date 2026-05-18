@@ -8,7 +8,7 @@ import aiofiles
 from fastapi import FastAPI, File, Request, UploadFile, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -33,29 +33,43 @@ EXE_MIMES = frozenset(
     }
 )
 RAR_MIMES = frozenset(
-    {
-        "application/vnd.rar",
-        "application/x-rar-compressed",
-        "application/x-rar",
-    }
+    {"application/vnd.rar", "application/x-rar-compressed", "application/x-rar"}
 )
+ZIP_MIMES = frozenset(
+    {"application/zip", "application/x-zip-compressed", "application/x-zip"}
+)
+SEVENZIP_MIMES = frozenset({"application/x-7z-compressed"})
+GZ_MIMES = frozenset({"application/gzip", "application/x-gzip"})
+BZ2_MIMES = frozenset({"application/x-bzip2"})
+XZ_MIMES = frozenset({"application/x-xz"})
+TAR_MIMES = frozenset({"application/x-tar"})
+
+# All compression/archive formats grouped — share a single size limit
+COMPRESS_MIMES = RAR_MIMES | ZIP_MIMES | SEVENZIP_MIMES | GZ_MIMES | BZ2_MIMES | XZ_MIMES | TAR_MIMES
 
 ALLOWED_MIME_TYPES = (
-    IMAGE_MIMES | WAV_MIMES | MP3_MIMES | MP4_MIMES | EXE_MIMES | RAR_MIMES
+    IMAGE_MIMES | WAV_MIMES | MP3_MIMES | MP4_MIMES | EXE_MIMES | COMPRESS_MIMES
 )
 
 EXTENSION_MIME_MAP = {
-    ".jpg": "image/jpeg",
+    ".jpg":  "image/jpeg",
     ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif",
+    ".png":  "image/png",
+    ".gif":  "image/gif",
     ".webp": "image/webp",
-    ".bmp": "image/bmp",
-    ".wav": "audio/wav",
-    ".mp3": "audio/mpeg",
-    ".mp4": "video/mp4",
-    ".exe": "application/x-msdownload",
-    ".rar": "application/x-rar-compressed",
+    ".bmp":  "image/bmp",
+    ".wav":  "audio/wav",
+    ".mp3":  "audio/mpeg",
+    ".mp4":  "video/mp4",
+    ".exe":  "application/x-msdownload",
+    ".rar":  "application/x-rar-compressed",
+    ".zip":  "application/zip",
+    ".7z":   "application/x-7z-compressed",
+    ".gz":   "application/gzip",
+    ".tgz":  "application/gzip",
+    ".bz2":  "application/x-bzip2",
+    ".xz":   "application/x-xz",
+    ".tar":  "application/x-tar",
 }
 
 OCTET_STREAM = "application/octet-stream"
@@ -67,8 +81,11 @@ _CHUNK_SIZE = 256 * 1024  # 256 KB
 
 app = FastAPI(
     title="File Server",
-    description="Servidor de archivos (imágenes, audio, video, ejecutables y RAR) con almacenamiento persistente.",
-    version="1.2.0",
+    description=(
+        "Servidor de archivos (imágenes, audio, video, ejecutables y "
+        "archivos comprimidos) con almacenamiento persistente."
+    ),
+    version="1.3.0",
 )
 
 app.add_middleware(
@@ -95,11 +112,11 @@ def _max_bytes_for_mime(mime: str) -> int:
     if mime in MP3_MIMES:
         return _mb_to_bytes(int(os.getenv("MAX_MP3_FILE_SIZE_MB", "50")))
     if mime in MP4_MIMES:
-        return _mb_to_bytes(int(os.getenv("MAX_MP4_FILE_SIZE_MB", "100")))
+        return _mb_to_bytes(int(os.getenv("MAX_MP4_FILE_SIZE_MB", "200")))
     if mime in EXE_MIMES:
-        return _mb_to_bytes(int(os.getenv("MAX_EXE_FILE_SIZE_MB", "50")))
-    if mime in RAR_MIMES:
-        return _mb_to_bytes(int(os.getenv("MAX_RAR_FILE_SIZE_MB", "300")))
+        return _mb_to_bytes(int(os.getenv("MAX_EXE_FILE_SIZE_MB", "300")))
+    if mime in COMPRESS_MIMES:
+        return _mb_to_bytes(int(os.getenv("MAX_COMPRESS_FILE_SIZE_MB", "300")))
     return _mb_to_bytes(10)
 
 
@@ -115,7 +132,7 @@ def _resolve_content_type(content_type: str, filename: str) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Validators (signature-only checks — operate on header bytes, not full data)
+# Validators — operate on the first N header bytes, not the full file
 # ---------------------------------------------------------------------------
 
 
@@ -169,12 +186,54 @@ def _validate_rar(header: bytes) -> None:
         raise HTTPException(status_code=422, detail="El archivo no es un RAR válido.")
 
 
+def _validate_zip(header: bytes) -> None:
+    # PK\x03\x04 = normal zip, PK\x05\x06 = empty, PK\x07\x08 = spanned
+    if len(header) < 2 or header[:2] != b"PK":
+        raise HTTPException(status_code=422, detail="El archivo no es un ZIP válido.")
+
+
+def _validate_7z(header: bytes) -> None:
+    if len(header) < 6 or header[:6] != b"7z\xbc\xaf\x27\x1c":
+        raise HTTPException(status_code=422, detail="El archivo no es un 7Z válido.")
+
+
+def _validate_gz(header: bytes) -> None:
+    if len(header) < 2 or header[:2] != b"\x1f\x8b":
+        raise HTTPException(status_code=422, detail="El archivo no es un GZ válido.")
+
+
+def _validate_bz2(header: bytes) -> None:
+    if len(header) < 3 or header[:3] != b"BZh":
+        raise HTTPException(status_code=422, detail="El archivo no es un BZ2 válido.")
+
+
+def _validate_xz(header: bytes) -> None:
+    if len(header) < 5 or header[:5] != b"\xfd7zXZ":
+        raise HTTPException(status_code=422, detail="El archivo no es un XZ válido.")
+
+
+def _validate_tar(header: bytes) -> None:
+    # POSIX ustar magic at byte offset 257; lenient for old GNU tar format
+    if len(header) >= 262 and header[257:262] == b"ustar":
+        return
+    # Old GNU tar has no magic — accept without strict validation
+    if len(header) < 262:
+        return
+    raise HTTPException(status_code=422, detail="El archivo no es un TAR válido.")
+
+
 _HEADER_VALIDATORS: dict = {
-    **{m: _validate_wav for m in WAV_MIMES},
-    **{m: _validate_mp3 for m in MP3_MIMES},
-    **{m: _validate_mp4 for m in MP4_MIMES},
-    **{m: _validate_exe for m in EXE_MIMES},
-    **{m: _validate_rar for m in RAR_MIMES},
+    **{m: _validate_wav    for m in WAV_MIMES},
+    **{m: _validate_mp3    for m in MP3_MIMES},
+    **{m: _validate_mp4    for m in MP4_MIMES},
+    **{m: _validate_exe    for m in EXE_MIMES},
+    **{m: _validate_rar    for m in RAR_MIMES},
+    **{m: _validate_zip    for m in ZIP_MIMES},
+    **{m: _validate_7z     for m in SEVENZIP_MIMES},
+    **{m: _validate_gz     for m in GZ_MIMES},
+    **{m: _validate_bz2    for m in BZ2_MIMES},
+    **{m: _validate_xz     for m in XZ_MIMES},
+    **{m: _validate_tar    for m in TAR_MIMES},
 }
 
 
@@ -218,7 +277,7 @@ async def _stream_to_disk(
     return bytes_written
 
 
-def _read_file_header(path: Path, n: int = 64) -> bytes:
+def _read_file_header(path: Path, n: int = 512) -> bytes:
     with open(path, "rb") as f:
         return f.read(n)
 
@@ -236,13 +295,28 @@ def _upload_success_message(mime: str) -> str:
         return "Ejecutable subido correctamente."
     if mime in RAR_MIMES:
         return "Archivo RAR subido correctamente."
+    if mime in ZIP_MIMES:
+        return "Archivo ZIP subido correctamente."
+    if mime in SEVENZIP_MIMES:
+        return "Archivo 7Z subido correctamente."
+    if mime in GZ_MIMES:
+        return "Archivo GZ subido correctamente."
+    if mime in BZ2_MIMES:
+        return "Archivo BZ2 subido correctamente."
+    if mime in XZ_MIMES:
+        return "Archivo XZ subido correctamente."
+    if mime in TAR_MIMES:
+        return "Archivo TAR subido correctamente."
     return "Archivo subido correctamente."
 
 
 def _safe_filename(original: str, unique_id: str) -> str:
-    ext = Path(original).suffix.lower()
-    if not ext:
-        ext = ".bin"
+    # Preserve compound extensions like .tar.gz
+    name = Path(original).name
+    for compound in (".tar.gz", ".tar.bz2", ".tar.xz"):
+        if name.lower().endswith(compound):
+            return f"{unique_id}{compound}"
+    ext = Path(original).suffix.lower() or ".bin"
     return f"{unique_id}{ext}"
 
 
@@ -283,8 +357,8 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
             detail=(
                 f"Tipo de archivo no permitido: '{file.content_type}'. "
                 f"Permitidos: {sorted(ALLOWED_MIME_TYPES)}. "
-                f"Para .exe y .rar usa la extensión correcta si el cliente envía "
-                f"'{OCTET_STREAM}'."
+                f"Si el cliente envía '{OCTET_STREAM}', asegúrate de que "
+                f"el nombre del archivo incluya la extensión correcta."
             ),
         )
 
@@ -359,7 +433,6 @@ def list_files(
     }
 
 
-# Keep /images as alias for backwards compatibility
 @app.get("/images", summary="[Alias] Listar archivos — usar /files", include_in_schema=False)
 def list_images_alias(
     request: Request,

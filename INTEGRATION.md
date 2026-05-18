@@ -37,13 +37,21 @@ Las rutas canónicas son `/files/*`. Las rutas antiguas `/images/*` se mantienen
 | Categoría | Extensiones | MIME types aceptados | Límite |
 |-----------|-------------|----------------------|--------|
 | Imágenes | `.jpg` `.jpeg` `.png` `.gif` `.webp` `.bmp` | `image/jpeg` `image/png` `image/gif` `image/webp` `image/bmp` | **10 MB** |
-| Audio WAV | `.wav` | `audio/wav` `audio/x-wav` `audio/wave` `audio/vnd.wave` | **50 MB** |
-| Audio MP3 | `.mp3` | `audio/mpeg` `audio/mp3` | **50 MB** |
-| Video MP4 | `.mp4` | `video/mp4` | **100 MB** |
-| Ejecutable | `.exe` | `application/x-msdownload` `application/vnd.microsoft.portable-executable` `application/x-msdos-program` | **50 MB** |
-| Archivo RAR | `.rar` | `application/vnd.rar` `application/x-rar-compressed` `application/x-rar` | **300 MB** |
+| WAV | `.wav` | `audio/wav` `audio/x-wav` `audio/wave` `audio/vnd.wave` | **50 MB** |
+| MP3 | `.mp3` | `audio/mpeg` `audio/mp3` | **50 MB** |
+| MP4 | `.mp4` | `video/mp4` | **200 MB** |
+| EXE | `.exe` | `application/x-msdownload` `application/vnd.microsoft.portable-executable` | **300 MB** |
+| RAR | `.rar` | `application/vnd.rar` `application/x-rar-compressed` `application/x-rar` | **300 MB** |
+| ZIP | `.zip` | `application/zip` `application/x-zip-compressed` | **300 MB** |
+| 7-Zip | `.7z` | `application/x-7z-compressed` | **300 MB** |
+| GZip | `.gz` `.tgz` | `application/gzip` `application/x-gzip` | **300 MB** |
+| BZip2 | `.bz2` | `application/x-bzip2` | **300 MB** |
+| XZ | `.xz` | `application/x-xz` | **300 MB** |
+| TAR | `.tar` | `application/x-tar` | **300 MB** |
 
-> **Nota para `.exe` y `.rar`:** algunos clientes HTTP envían `application/octet-stream` en lugar del MIME correcto. El servidor detecta automáticamente el tipo por la **extensión del nombre de archivo** cuando esto ocurre, así que asegúrate de que el nombre incluya la extensión correcta.
+> **Nota:** Si el cliente HTTP envía `application/octet-stream` (común con `.exe`, `.rar`, `.zip`, `.7z`, etc.), el servidor detecta el tipo automáticamente por la **extensión del nombre de archivo**. Asegúrate de que el nombre incluya la extensión correcta.
+
+> **Extensiones compuestas:** `.tar.gz`, `.tar.bz2` y `.tar.xz` se preservan tal cual en el nombre del archivo guardado.
 
 ---
 
@@ -74,11 +82,11 @@ Sube un archivo al servidor. Debe enviarse como `multipart/form-data`.
 **Respuesta `201 Created`**
 ```json
 {
-  "message": "Archivo RAR subido correctamente.",
-  "filename": "3f9a1b2cde4f56789abc0def12345678.rar",
-  "url": "https://image-server-ax7b.onrender.com/files/3f9a1b2cde4f56789abc0def12345678.rar",
+  "message": "Archivo ZIP subido correctamente.",
+  "filename": "3f9a1b2cde4f56789abc0def12345678.zip",
+  "url": "https://image-server-ax7b.onrender.com/files/3f9a1b2cde4f56789abc0def12345678.zip",
   "size_bytes": 52428800,
-  "mime_type": "application/x-rar-compressed"
+  "mime_type": "application/zip"
 }
 ```
 
@@ -108,10 +116,10 @@ Lista todos los archivos almacenados, ordenados por fecha de subida (más recien
   "page_size": 10,
   "files": [
     {
-      "filename": "3f9a1b2cde4f56789abc0def12345678.rar",
+      "filename": "3f9a1b2cde4f56789abc0def12345678.zip",
       "size_bytes": 52428800,
-      "mime_type": "application/x-rar-compressed",
-      "url": "https://image-server-ax7b.onrender.com/files/3f9a1b2cde4f56789abc0def12345678.rar"
+      "mime_type": "application/zip",
+      "url": "https://image-server-ax7b.onrender.com/files/3f9a1b2cde4f56789abc0def12345678.zip"
     }
   ]
 }
@@ -139,13 +147,13 @@ Devuelve la metadata completa del archivo. Para imágenes incluye dimensiones.
 
 **Alias retrocompatible:** `GET /images/{filename}/info`
 
-**Respuesta `200` — archivo no-imagen**
+**Respuesta `200` — archivo comprimido**
 ```json
 {
-  "filename": "3f9a1b2cde4f56789abc0def12345678.rar",
+  "filename": "3f9a1b2cde4f56789abc0def12345678.zip",
   "size_bytes": 52428800,
-  "mime_type": "application/x-rar-compressed",
-  "url": "https://image-server-ax7b.onrender.com/files/3f9a1b2cde4f56789abc0def12345678.rar"
+  "mime_type": "application/zip",
+  "url": "https://image-server-ax7b.onrender.com/files/3f9a1b2cde4f56789abc0def12345678.zip"
 }
 ```
 
@@ -172,7 +180,7 @@ Elimina permanentemente un archivo del servidor.
 **Respuesta `200`**
 ```json
 {
-  "message": "Archivo '3f9a1b2cde4f56789abc0def12345678.rar' eliminado correctamente."
+  "message": "Archivo '3f9a1b2cde4f56789abc0def12345678.zip' eliminado correctamente."
 }
 ```
 
@@ -208,7 +216,7 @@ Devuelto por `POST /upload`.
 | `filename` | `string` | Nombre único asignado al archivo |
 | `url` | `string` | URL absoluta para acceder al archivo |
 | `size_bytes` | `integer` | Tamaño del archivo guardado |
-| `mime_type` | `string` | Tipo MIME del archivo aceptado |
+| `mime_type` | `string` | Tipo MIME aceptado |
 
 ---
 
@@ -264,7 +272,7 @@ async function uploadFile(filePath) {
 }
 
 // Uso
-const result = await uploadFile('./archivo.rar');
+const result = await uploadFile('./backup.zip');
 console.log('URL permanente:', result.url);
 ```
 
@@ -359,7 +367,7 @@ def delete_file(filename: str) -> dict:
 
 
 # Uso
-result = upload_file("./backup.rar")
+result = upload_file("./backup.zip")
 print("URL permanente:", result["url"])
 ```
 
@@ -413,7 +421,7 @@ function deleteFile(string $filename): array {
 }
 
 // Uso
-$result = uploadFile('/ruta/a/backup.rar');
+$result = uploadFile('/ruta/a/backup.zip');
 echo "URL permanente: " . $result['url'];
 ```
 
@@ -427,10 +435,28 @@ curl -X POST https://image-server-ax7b.onrender.com/upload \
   -F "file=@/ruta/a/imagen.jpg"
 ```
 
-**Subir un WAV**
+**Subir un ZIP**
 ```bash
 curl -X POST https://image-server-ax7b.onrender.com/upload \
-  -F "file=@/ruta/a/audio.wav"
+  -F "file=@/ruta/a/backup.zip"
+```
+
+**Subir un 7Z**
+```bash
+curl -X POST https://image-server-ax7b.onrender.com/upload \
+  -F "file=@/ruta/a/backup.7z"
+```
+
+**Subir un RAR**
+```bash
+curl -X POST https://image-server-ax7b.onrender.com/upload \
+  -F "file=@/ruta/a/backup.rar"
+```
+
+**Subir un TAR.GZ**
+```bash
+curl -X POST https://image-server-ax7b.onrender.com/upload \
+  -F "file=@/ruta/a/backup.tar.gz"
 ```
 
 **Subir un MP4**
@@ -445,12 +471,6 @@ curl -X POST https://image-server-ax7b.onrender.com/upload \
   -F "file=@/ruta/a/setup.exe"
 ```
 
-**Subir un RAR**
-```bash
-curl -X POST https://image-server-ax7b.onrender.com/upload \
-  -F "file=@/ruta/a/backup.rar"
-```
-
 **Listar archivos**
 ```bash
 curl "https://image-server-ax7b.onrender.com/files?page=1&page_size=20"
@@ -458,19 +478,19 @@ curl "https://image-server-ax7b.onrender.com/files?page=1&page_size=20"
 
 **Ver metadata**
 ```bash
-curl https://image-server-ax7b.onrender.com/files/3f9a1b2c...rar/info
+curl https://image-server-ax7b.onrender.com/files/3f9a1b2c...zip/info
 ```
 
 **Descargar un archivo**
 ```bash
-curl -o descargado.rar \
-  https://image-server-ax7b.onrender.com/files/3f9a1b2c...rar
+curl -o descargado.zip \
+  https://image-server-ax7b.onrender.com/files/3f9a1b2c...zip
 ```
 
 **Eliminar un archivo**
 ```bash
 curl -X DELETE \
-  https://image-server-ax7b.onrender.com/files/3f9a1b2c...rar
+  https://image-server-ax7b.onrender.com/files/3f9a1b2c...zip
 ```
 
 ---
@@ -482,9 +502,9 @@ curl -X DELETE \
 | Tamaño máximo — imágenes | **10 MB** |
 | Tamaño máximo — WAV | **50 MB** |
 | Tamaño máximo — MP3 | **50 MB** |
-| Tamaño máximo — MP4 | **100 MB** |
-| Tamaño máximo — EXE | **50 MB** |
-| Tamaño máximo — RAR | **300 MB** |
+| Tamaño máximo — MP4 | **200 MB** |
+| Tamaño máximo — EXE | **300 MB** |
+| Tamaño máximo — RAR / ZIP / 7Z / GZ / BZ2 / XZ / TAR | **300 MB** |
 | Máximo `page_size` en listado | **100** |
 | Autenticación requerida | Ninguna |
 | CORS | Todos los orígenes (`*`) |
@@ -494,15 +514,15 @@ curl -X DELETE \
 ## 8. Notas de implementación
 
 ### Nombres de archivo
-El servidor **nunca conserva el nombre original** del archivo. Asigna un UUID hexadecimal de 32 caracteres seguido de la extensión original (ej. `3f9a1b2cde4f56789abc0def12345678.rar`). Esto garantiza unicidad y evita colisiones.
+El servidor **nunca conserva el nombre original** del archivo. Asigna un UUID hexadecimal de 32 caracteres seguido de la extensión original (ej. `3f9a1b2cde4f56789abc0def12345678.zip`). Las extensiones compuestas como `.tar.gz` se preservan completas.
 
 **Recomendación:** en tu base de datos guarda siempre el campo `url` completo devuelto por `/upload`, no el nombre original.
 
 ### Validación de archivos
 El servidor realiza una doble validación para cada tipo:
 
-1. **MIME type** del header `Content-Type` de la petición (o extensión del nombre si el cliente envía `application/octet-stream`).
-2. **Firma de cabecera** del archivo real en disco para evitar archivos corruptos o disfrazados:
+1. **MIME type** del header `Content-Type` (o extensión del nombre si el cliente envía `application/octet-stream`).
+2. **Firma de cabecera** del archivo real para evitar archivos corruptos o disfrazados:
 
 | Tipo | Firma verificada |
 |------|-----------------|
@@ -510,11 +530,17 @@ El servidor realiza una doble validación para cada tipo:
 | WAV | `RIFF....WAVE` (primeros 12 bytes) |
 | MP3 | `ID3` o frame sync MPEG (`0xFF 0xEx`) |
 | MP4 | caja `ftyp` (primeros 64 bytes) |
-| EXE | `MZ` (primeros 2 bytes — cabecera PE) |
-| RAR | `Rar!` (primeros 4 bytes — RAR4 y RAR5) |
+| EXE | `MZ` (cabecera PE) |
+| RAR | `Rar!` (RAR4 y RAR5) |
+| ZIP | `PK` (firma PK universal) |
+| 7Z | `7z\xBC\xAF\x27\x1C` |
+| GZ | `\x1F\x8B` |
+| BZ2 | `BZh` |
+| XZ | `\xFD7zXZ` |
+| TAR | `ustar` en offset 257 (lenient para GNU tar antiguo) |
 
 ### Subida en streaming
-Los archivos se escriben directamente a disco en chunks de 256 KB. El servidor **no carga el archivo completo en memoria**, lo que permite manejar archivos grandes (hasta 300 MB de RAR) sin saturar la RAM.
+Los archivos se escriben directamente a disco en chunks de 256 KB. El servidor **no carga el archivo completo en memoria**, lo que permite manejar archivos de hasta 300 MB sin saturar la RAM.
 
 ### Persistencia
 Los archivos se almacenan en el disco persistente de Render montado en `/data/images`. Los archivos **sobreviven a redespliegues y reinicios** del servidor. No existe expiración automática.

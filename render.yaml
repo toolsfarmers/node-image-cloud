@@ -18,11 +18,11 @@ services:
       - key: MAX_MP3_FILE_SIZE_MB
         value: "50"
       - key: MAX_MP4_FILE_SIZE_MB
-        value: "100"
+        value: "200"
       - key: MAX_EXE_FILE_SIZE_MB
-        value: "50"
-      - key: MAX_RAR_FILE_SIZE_MB
         value: "300"
+      - key: MAX_COMPRESS_FILE_SIZE_MB
+        value: "300"               # RAR, ZIP, 7Z, GZ, BZ2, XZ, TAR
       - key: PYTHON_VERSION
         value: "3.12.0"
 

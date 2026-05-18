@@ -1,7 +1,7 @@
 # File Cloud Server
 
 Servidor de archivos construido con **FastAPI** y desplegado en **Render** con disco persistente.  
-Soporta imágenes, audio (WAV, MP3), video (MP4), ejecutables (.exe) y archivos RAR.
+Soporta imágenes, audio (WAV, MP3), video (MP4), ejecutables (.exe) y archivos comprimidos (RAR, ZIP, 7Z, GZ, BZ2, XZ, TAR).
 
 ## Endpoints
 
@@ -20,14 +20,14 @@ Documentación interactiva disponible en `/docs` (Swagger UI) y `/redoc`.
 
 ## Tipos de archivo permitidos
 
-| Categoría | Extensiones | Límite |
-|-----------|-------------|--------|
-| Imágenes  | `.jpg` `.png` `.gif` `.webp` `.bmp` | 10 MB |
-| WAV       | `.wav` | 50 MB |
-| MP3       | `.mp3` | 50 MB |
-| MP4       | `.mp4` | 100 MB |
-| EXE       | `.exe` | 50 MB |
-| RAR       | `.rar` | 300 MB |
+| Categoría     | Extensiones | Límite |
+|---------------|-------------|--------|
+| Imágenes      | `.jpg` `.png` `.gif` `.webp` `.bmp` | 10 MB |
+| WAV           | `.wav` | 50 MB |
+| MP3           | `.mp3` | 50 MB |
+| MP4           | `.mp4` | 200 MB |
+| EXE           | `.exe` | 300 MB |
+| Comprimidos   | `.rar` `.zip` `.7z` `.gz` `.tgz` `.bz2` `.xz` `.tar` | 300 MB |
 
 ---
 
@@ -56,7 +56,7 @@ Los archivos se guardan en `./data/images/` en local.
 1. Sube el repositorio a GitHub (o GitLab).
 2. En el panel de Render crea un nuevo servicio usando **"New → Blueprint"** y apunta al repositorio. El archivo `render.yaml` configura automáticamente:
    - El servicio web con Python/uvicorn.
-   - Un **disco persistente de 50 GB** montado en `/data/images` (los archivos sobreviven a reinicios y redespliegues).
+   - Un **disco persistente de 50 GB** montado en `/data/images`.
 3. *(Alternativa)* Crea manualmente un "Web Service" con:
    - **Build command:** `pip install -r requirements.txt`
    - **Start command:** `uvicorn main:app --host 0.0.0.0 --port $PORT`
@@ -69,12 +69,12 @@ Los archivos se guardan en `./data/images/` en local.
 
 ## Variables de entorno
 
-| Variable                | Valor por defecto | Descripción                          |
-|-------------------------|-------------------|--------------------------------------|
-| `IMAGES_DIR`            | `./data/images`   | Directorio donde se almacenan archivos |
-| `MAX_FILE_SIZE_MB`      | `10`              | Límite para imágenes en MB           |
-| `MAX_WAV_FILE_SIZE_MB`  | `50`              | Límite para WAV en MB                |
-| `MAX_MP3_FILE_SIZE_MB`  | `50`              | Límite para MP3 en MB                |
-| `MAX_MP4_FILE_SIZE_MB`  | `100`             | Límite para MP4 en MB                |
-| `MAX_EXE_FILE_SIZE_MB`  | `50`              | Límite para EXE en MB                |
-| `MAX_RAR_FILE_SIZE_MB`  | `300`             | Límite para RAR en MB                |
+| Variable                    | Por defecto | Descripción |
+|-----------------------------|-------------|-------------|
+| `IMAGES_DIR`                | `./data/images` | Directorio de almacenamiento |
+| `MAX_FILE_SIZE_MB`          | `10`  | Límite imágenes (MB) |
+| `MAX_WAV_FILE_SIZE_MB`      | `50`  | Límite WAV (MB) |
+| `MAX_MP3_FILE_SIZE_MB`      | `50`  | Límite MP3 (MB) |
+| `MAX_MP4_FILE_SIZE_MB`      | `200` | Límite MP4 (MB) |
+| `MAX_EXE_FILE_SIZE_MB`      | `300` | Límite EXE (MB) |
+| `MAX_COMPRESS_FILE_SIZE_MB` | `300` | Límite RAR/ZIP/7Z/GZ/BZ2/XZ/TAR (MB) |
