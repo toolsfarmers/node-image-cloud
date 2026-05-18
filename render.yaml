@@ -13,10 +13,20 @@ services:
         value: /data/images       # Ruta del disco persistente montado
       - key: MAX_FILE_SIZE_MB
         value: "10"               # Tamaño máximo por imagen en MB
+      - key: MAX_WAV_FILE_SIZE_MB
+        value: "50"               # Tamaño máximo por WAV en MB
+      - key: MAX_MP3_FILE_SIZE_MB
+        value: "50"
+      - key: MAX_MP4_FILE_SIZE_MB
+        value: "100"
+      - key: MAX_EXE_FILE_SIZE_MB
+        value: "50"
+      - key: MAX_RAR_FILE_SIZE_MB
+        value: "300"
       - key: PYTHON_VERSION
         value: "3.12.0"
 
     disk:
       name: images-storage
       mountPath: /data/images     # Render monta el disco aquí; los archivos son permanentes
-      sizeGB: 10                  # Ajusta el tamaño según tus necesidades
+      sizeGB: 50                  # Ajusta el tamaño según tus necesidades (RARs de 300 MB necesitan espacio extra)
